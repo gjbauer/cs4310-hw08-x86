@@ -9,7 +9,6 @@
 #include "spinlock.h"
 #include "sleeplock.h"
 #include "file.h"
-#include "proc.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -33,8 +32,6 @@ filealloc(void)
   for(f = ftable.file; f < ftable.file + NFILE; f++){
     if(f->ref == 0){
       f->ref = 1;
-      f->read_bytes=0;
-      f->write_bytes=0;
       release(&ftable.lock);
       return f;
     }
@@ -47,8 +44,9 @@ filealloc(void)
 int
 getfd(struct file* fd) {
 	struct file *fd2;
+    struct proc *p = myproc();
 	int i=0;
-	while ((fd2=myproc()->ofile[i])) {
+	while ((fd2=p->ofile[i])) {
 	if (fd2 == fd)
 		return i;
 	if (i > 255)
@@ -151,13 +149,16 @@ fileread(struct file *f, char *addr, int n)
 
   if(f->readable == 0)
     return -1;
-  if(f->type == FD_PIPE)
+  if(f->type == FD_PIPE) {
+    update_bytes(f, 0, n);
     return piperead(f->pipe, addr, n);
+  }
   if(f->type == FD_INODE){
     ilock(f->ip);
     if((r = readi(f->ip, addr, f->off, n)) > 0)
       f->off += r;
     iunlock(f->ip);
+    update_bytes(f, 0, n);
     return r;
   }
   panic("fileread");
@@ -172,8 +173,10 @@ filewrite(struct file *f, char *addr, int n)
 
   if(f->writable == 0)
     return -1;
-  if(f->type == FD_PIPE)
+  if(f->type == FD_PIPE) {
+    update_bytes(f, 1, n);
     return pipewrite(f->pipe, addr, n);
+  }
   if(f->type == FD_INODE){
     // write a few blocks at a time to avoid exceeding
     // the maximum log transaction size, including
@@ -201,6 +204,7 @@ filewrite(struct file *f, char *addr, int n)
         panic("short filewrite");
       i += r;
     }
+    update_bytes(f, 1, i);
     return i == n ? n : -1;
   }
   panic("filewrite");

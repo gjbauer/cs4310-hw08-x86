@@ -444,7 +444,7 @@ sys_pipe(void)
 }
 
 int
-sys_iostats(void)
+sys_getiostats(void)
 {
 	/* int
 	 * my_kernel_function(uint64 *user_addr) {
@@ -467,11 +467,11 @@ sys_iostats(void)
 	//printf("iostats\n");
 	struct proc *p = myproc(); 
 	struct file *f;
-	uint64 ptr;
+	char *ptr;
 	struct iostats io;
 	int err, fd;
 
-	argaddr(1, &ptr);
+	argptr(1, &ptr, sizeof(io));
 	argint(0, &fd);
 	
 	
@@ -484,7 +484,7 @@ sys_iostats(void)
 	else {
 		fetchiostats(f, &io);
 	}
-	err = copyout(p->pagetable, ptr, (char*)&io, sizeof(io));	// Implemented a copyout using our own memncpy instead of memmove to avoid pointers persisting and messing up tests..
+	err = copyout(p->pgdir, (uint*)ptr, (char*)&io, sizeof(io));	// Implemented a copyout using our own memncpy instead of memmove to avoid pointers persisting and messing up tests..
 	if(err == -1) {
 		// error, something went wrong, return an error or panic
 		panic("iostats");
