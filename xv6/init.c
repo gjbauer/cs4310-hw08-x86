@@ -17,7 +17,7 @@ main(void)
     open("console", O_RDWR);
   }
   dup(0);  // stdout
-  dup(0);  // stderr
+  dup(2);  // stderr
 
   for(;;){
     printf(1, "init: starting sh\n");

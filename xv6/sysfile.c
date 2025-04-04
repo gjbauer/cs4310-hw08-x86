@@ -99,6 +99,8 @@ sys_close(void)
   if(argfd(0, &fd, &f) < 0)
     return -1;
   myproc()->ofile[fd] = 0;
+  f->read_bytes = 0;
+  f->write_bytes = 0;
   fileclose(f);
   return 0;
 }
@@ -443,6 +445,8 @@ sys_pipe(void)
   return 0;
 }
 
+/*	-- Our section --	*/
+
 int
 sys_getiostats(void)
 {
@@ -464,7 +468,6 @@ sys_getiostats(void)
 	 *  }
 	 *}
 	 */
-	//printf("iostats\n");
 	struct proc *p = myproc(); 
 	struct file *f;
 	char *ptr;
@@ -472,22 +475,22 @@ sys_getiostats(void)
 	int err, fd;
 
 	argptr(1, &ptr, sizeof(io));
-	argint(0, &fd);
 	
-	
-	if(fd < 2) {
+	if(argfd(0, 0, &f) < 0)
+		return -1;
+	else if((fd=getfd(f)) == 0) {
 		io.read_bytes = 0;
 		io.write_bytes = 0;
 	}
-	else if(argfd(0, 0, &f) < 0)
-		return -1;
 	else {
 		fetchiostats(f, &io);
 	}
-	err = copyout(p->pgdir, (uint*)ptr, (char*)&io, sizeof(io));	// Implemented a copyout using our own memncpy instead of memmove to avoid pointers persisting and messing up tests..
+	err = copyout(p->pgdir, (uint)ptr, (char*)&io, sizeof(io));	// Implemented a copyout using our own memncpy instead of memmove to avoid pointers persisting and messing up tests..
 	if(err == -1) {
 		// error, something went wrong, return an error or panic
 		panic("iostats");
 	}
 	return 0;
 }
+
+/*	-- End of our section --	*/

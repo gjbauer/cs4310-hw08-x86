@@ -1,5 +1,5 @@
-void fetchiostats(struct file* f, struct iostats* io);
-
+int getfd(struct file* fd);
+void fetchiostats(struct file*, struct iostats*);
 struct file {
   enum { FD_NONE, FD_PIPE, FD_INODE } type;
   int ref; // reference count

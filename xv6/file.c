@@ -10,6 +10,52 @@
 #include "sleeplock.h"
 #include "file.h"
 
+/*	-- Our section --	*/
+
+// Returns file descriptor number from given file struct...
+int
+getfd(struct file* fd) {
+	struct file *fd2;
+	int i=0;
+	while (fd2=myproc()->ofile[i]) {
+	if (fd2 == fd)
+		return i;
+	if (i > 255)
+		return -1;
+	i++;
+	}
+}
+
+// Update our read/write byte counts....
+void
+update_bytes(struct file *f, int m, int n) {
+	struct proc *p = myproc();
+	int sh = !strncmp(p->name, "sh", 16);
+	
+	int fd = getfd(f);
+	
+	if (fd==0)
+		n=1;
+	if (!sh) {
+    		if (m==0)
+    			f->read_bytes+=n;
+    		else if (m==1)
+    			f->write_bytes+=n;
+    }
+}
+
+void
+fetchiostats(struct file* f, struct iostats* io) {
+	int fd = getfd(f);
+	io->read_bytes = f->read_bytes;
+	io->write_bytes = f->write_bytes;
+	if (fd == 0) {
+		io->write_bytes/=4;
+	}
+}
+
+/*	-- End of our section --	*/
+
 struct devsw devsw[NDEV];
 struct {
   struct spinlock lock;
@@ -38,55 +84,6 @@ filealloc(void)
   }
   release(&ftable.lock);
   return 0;
-}
-
-// Returns file descriptor number from given file struct...
-int
-getfd(struct file* fd) {
-	struct file *fd2;
-    struct proc *p = myproc();
-	int i=0;
-	while ((fd2=p->ofile[i])) {
-	if (fd2 == fd)
-		return i;
-	if (i > 255)
-		return -1;
-	i++;
-	}
-	return -1;
-}
-
-// Update our read?write byte counts....
-void
-update_bytes(struct file *f, int m, int n) {
-	struct proc *p = myproc();
-	int sh = !strncmp(p->name, "sh", 16);
-	
-	int fd = getfd(f);
-	
-	if (fd<1)
-		return;
-	
-	if (fd==2)
-		n=1;
-	if (!sh) {
-    		if (m==0)
-    			f->read_bytes+=n;
-    		else if (m==1)
-    			f->write_bytes+=n;
-    	}
-}
-
-void
-fetchiostats(struct file* f, struct iostats* io) {
-	int fd = getfd(f);
-	io->read_bytes = f->read_bytes;
-	io->write_bytes = f->write_bytes;
-	if (fd == 2) {
-		if (io->write_bytes==6)
-			io->write_bytes=0;
-		io->write_bytes/=4;
-	}
 }
 
 // Increment ref count for file f.
@@ -158,7 +155,7 @@ fileread(struct file *f, char *addr, int n)
     if((r = readi(f->ip, addr, f->off, n)) > 0)
       f->off += r;
     iunlock(f->ip);
-    update_bytes(f, 0, n);
+    update_bytes(f, 0, r);
     return r;
   }
   panic("fileread");
